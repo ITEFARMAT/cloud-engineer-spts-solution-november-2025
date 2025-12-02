@@ -11,6 +11,12 @@ services:
       - prod-db-data:/var/lib/postgresql/data
     networks:
       - backend-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-appuser} -d $${POSTGRES_DB:-appdb} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   backend-app:
@@ -29,9 +35,9 @@ services:
       CORS_ORIGINS: '["https://twoja-domena.pl"]'
       CORS_CREDENTIALS: "true"
       CORS_EXPOSE_HEADERS: '["WWW-Authenticate"]'
-
     depends_on:
-  
+      db:
+        condition: service_healthy
     networks:
       - backend-net
     restart: unless-stopped
@@ -41,7 +47,6 @@ services:
       - /var/tmp
     security_opt:
       - no-new-privileges:true
-
     healthcheck:
       test: 'curl -s -o /dev/null -w \"%{http_code}\" "localhost:8080/api/v1/activity"'
       interval: 10s
