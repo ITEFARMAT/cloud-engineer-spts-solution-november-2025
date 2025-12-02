@@ -1,0 +1,23 @@
+.docker_build:
+  stage: build
+  image: docker:28.2.1
+  tags:
+  services:
+    - docker:dind
+  variables:
+    CI_REGISTRY: "registry.example.com"
+    DOCKERFILE_PATH: ""
+    APP_IMAGE_NAME: "my-app"
+  before_script:
+    # envs get from secrets Gitlab CI/CD settings
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u $CI_REGISTRY_PROD_USER -p $CI_REGISTRY_PROD_PASSWORD $CI_PROD_REGISTRY
+  script:
+    # Build Docker image with the determined tag
+    - docker build -t $CI_REGISTRY/$APP_IMAGE_NAME:latest -f $DOCKERFILE_PATH .
+    - docker push $CI_REGISTRY/$APP_IMAGE_NAME:latest
+    - docker build -t $CI_PROD_REGISTRY/$APP_IMAGE_NAME:latest -f $DOCKERFILE_PATH .
+    - docker push $CI_PROD_REGISTRY/$APP_IMAGE_NAME:latest
+    
+    # If needed we can customize it with additional docker build arguments or tags, version etc
+    

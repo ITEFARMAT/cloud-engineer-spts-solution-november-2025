@@ -1,0 +1,16 @@
+
+.outdated_deps:
+  image: python:3.12-slim
+  variables:
+    POETRY_VERSION: "1.8.2"
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    PIP_NO_CACHE_DIR: "1"
+  before_script:
+    - pip install "poetry==$POETRY_VERSION"
+    - cd app
+  script:
+    - poetry show --outdated
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+

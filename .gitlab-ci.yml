@@ -1,0 +1,44 @@
+stages:
+  - test
+  - build
+
+
+include:
+  - local: "ci-templates/outdated-deps.yml"
+  - local: "ci-templates/docker-build.yml"
+  - local: "ci-templates/tests.yml"
+
+outdated-deps:
+  stage: test
+  extends: .outdated_deps
+  
+compose_tests:
+  stage: test
+  extends: .docker_tests
+
+build_backend:
+  stage: build
+  extends: .docker_build
+  variables:
+    APP_IMAGE_NAME: "backend"
+    DOCKERFILE_PATH: "docker/backend.dockerfile"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - docker/backend.dockerfile
+        - app/**/*
+        - app/pyproject.toml
+        - app/poetry.lock
+        
+build_nginx:
+  stage: build
+  extends: .docker_build
+  variables:
+    APP_IMAGE_NAME: "nginx"
+    DOCKERFILE_PATH: "docker/nginx.dockerfile"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - docker/nginx.dockerfile
+        - docker/conf/**/*
+        - static-content/index.html
