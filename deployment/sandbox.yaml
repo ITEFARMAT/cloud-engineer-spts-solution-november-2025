@@ -1,0 +1,73 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sandbox-postgres
+    environment:
+      POSTGRES_DB: "appdb"
+      POSTGRES_USER: "appuser"
+      POSTGRES_PASSWORD: "appdevpassword"
+    volumes:
+      - sandbox-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-net
+    ports:
+      - 5432:5432
+    restart: unless-stopped
+
+  backend-app:
+    build:
+      context: ..
+      dockerfile: docker/backend.dockerfile
+    image: sandbox-backend-app:latest
+    container_name: sandbox-backend-app
+    environment:
+      DEVELOPMENT: "true"
+      PORT: "8080"
+      API_PREFIX: "/api/v1"
+      HOST: "0.0.0.0"
+      POSTGRES_HOST: "db"
+      POSTGRES_USER: "appuser"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: "appdb"
+      POSTGRES_PASSWORD: "appdevpassword"
+      CORS_ORIGINS: '["http://localhost:8080"]'
+      CORS_CREDENTIALS: "true"
+      CORS_EXPOSE_HEADERS: '["WWW-Authenticate"]'
+    healthcheck:
+      test: 'curl -s -o /dev/null -w \"%{http_code}\" "localhost:8080/api/v1/activity"'
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend-net
+    restart: unless-stopped
+  nginx:
+    build:
+      context: ..
+      dockerfile: docker/nginx.dockerfile
+    image: sandbox-nginx-proxy:latest
+    container_name: sandbox-nginx
+    depends_on:
+      - backend-app
+    ports:
+      - "80:8080"
+    networks:
+      - backend-net
+    volumes:
+      - ../docker/conf/nginx.sandbox.conf:/etc/nginx/nginx.conf:ro
+      - ../static-content:/usr/share/nginx/html/static-content:ro
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+networks:
+  backend-net:
+    driver: bridge
+
+volumes:
+  sandbox-db-data:

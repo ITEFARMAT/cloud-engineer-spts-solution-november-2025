@@ -1,0 +1,82 @@
+
+services:
+  db:
+    image: "$registry-placeholder/postgres:16-alpine"
+    container_name: prod-postgres
+    environment:
+      POSTGRES_DB: "appdb"
+      POSTGRES_USER: "appuser"
+      POSTGRES_PASSWORD: "$SUPER_SECRET_PASSWORD"  
+    volumes:
+      - prod-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-net
+    restart: unless-stopped
+
+  backend-app:
+    image: "$registry-placeholder/backend-app:latest"
+    container_name: prod-backend-app
+    environment:
+      DEVELOPMENT: "false"
+      PORT: "8080"
+      API_PREFIX: "/api/v1"
+      HOST: "0.0.0.0"
+      POSTGRES_HOST: "db"
+      POSTGRES_USER: "appuser"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: "appdb"
+      POSTGRES_PASSWORD: "$SUPER_SECRET_PASSWORD"
+      CORS_ORIGINS: '["https://twoja-domena.pl"]'
+      CORS_CREDENTIALS: "true"
+      CORS_EXPOSE_HEADERS: '["WWW-Authenticate"]'
+
+    depends_on:
+  
+    networks:
+      - backend-net
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: 'curl -s -o /dev/null -w \"%{http_code}\" "localhost:8080/api/v1/activity"'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  nginx:
+    image: "$registry-placeholder/nginx-proxy:latest"
+    container_name: prod-nginx
+    depends_on:
+      backend-app:
+        condition: service_healthy
+    ports:
+      - "80:8080"   
+    networks:
+      - frontend-net
+      - backend-net
+    volumes:
+      - ../docker/conf/nginx.production.conf:/etc/nginx/nginx.conf:ro
+      - ../static-content:/usr/share/nginx/html/static-content:ro
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+    internal: true
+
+volumes:
+  prod-db-data:
